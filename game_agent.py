@@ -165,10 +165,69 @@ class MinimaxPlayer(IsolationPlayer):
             return self.minimax(game, self.search_depth)
 
         except SearchTimeout:
-            pass  # Handle any actions required after timeout as needed
+            print("Search timeout")  # Handle any actions required after timeout as needed
 
         # Return the best move from the last completed search iteration
         return best_move
+
+    def terminal_node(self, game, depth, player):
+        """Check if the game is a terminal node of the tree and return the
+        corresponding utility"""
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Our search is limited in depth, so if we reach it, we return as it is
+        if depth == 0:
+            return True, self.score(game, player)
+        else:
+            #Check if the game has ended
+            if game.utility(player) != 0.:
+                return True, self.score(game, player)
+            else:
+                return False, 0.
+
+    def get_max_value(self, game, depth):
+        """Given the available children, choose the one with the highest score"""
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Same as the min nodes, but the score point of view is our player
+        terminal, utility = self.terminal_node(game, depth, game.active_player)
+        if terminal:
+            return utility
+        max_value = float("-inf")
+        available_moves = game.get_legal_moves()
+        for move in available_moves:
+            # print("Max level move: {}".format(move))
+            node_value = self.get_min_value(game.forecast_move(move), depth-1)
+            # print("Max value: {}".format(node_value))
+            if node_value > max_value:
+                max_value = node_value
+        return max_value
+
+
+    def get_min_value(self, game, depth):
+        """Given the available children, choose the one with the lowest score"""
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Check if it is a terminal node, if it is simply return the score.
+        #The score here is from the opponent point of view (min level)
+        terminal, utility = self.terminal_node(game, depth, game.inactive_player)
+        if terminal:
+            return utility
+        #If our node is not terminal, search the minimum value
+        else:
+            min_value = float("inf")
+            available_moves = game.get_legal_moves()
+            for move in available_moves:
+                # print("Min level move: {}".format(move))
+                child_score = self.get_max_value(game.forecast_move(move), depth-1)
+                # print("Min level value: {}".format(child_score))
+                if child_score < min_value:
+                    min_value = child_score
+            return min_value
+
 
     def minimax(self, game, depth):
         """Implement depth-limited minimax search algorithm as described in
@@ -212,8 +271,30 @@ class MinimaxPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        #Initialize best move as invalid and with loss score
+        best_move = (-1, -1)
+        best_move_score = float("-inf")
+        available_actions = game.get_legal_moves()
+
+        #Check what happens if we take each of the possible actions
+        for action in available_actions:
+            # print("Checking: {}".format(action))
+            #Get the min nodes, children of the main node
+            child_node = game.forecast_move(action)
+            try:
+                #This is a max level, so the children will score based on min
+                child_value = self.get_min_value(child_node, depth - 1)
+                # print("Action value: {}".format(child_value))
+                #In case of a tie, favor the one that came first
+                if (child_value > best_move_score) or (best_move == (-1, -1)):
+                    best_move_score = child_value
+                    best_move = action
+            except SearchTimeout:
+                return best_move
+
+        # print("Available nodes:", available_actions)
+        # print("Best Move: {}".format(best_move))
+        return best_move
 
 
 class AlphaBetaPlayer(IsolationPlayer):
