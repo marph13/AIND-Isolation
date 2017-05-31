@@ -302,7 +302,6 @@ class AlphaBetaPlayer(IsolationPlayer):
     search with alpha-beta pruning. You must finish and test this player to
     make sure it returns a good move before the search time limit expires.
     """
-
     def get_move(self, game, time_left):
         """Search for the best move from the available legal moves and return a
         result before the time limit expires.
@@ -334,9 +333,100 @@ class AlphaBetaPlayer(IsolationPlayer):
             (-1, -1) if there are no available legal moves.
         """
         self.time_left = time_left
+        #Start with depth 2, but we try to go as far as we can
+        depth = 7
+        best_move = (-1, -1)
+        while self.time_left() > self.TIMER_THRESHOLD:
+            try:
+                best_move = self.alphabeta(game, depth)
+                depth += 1
+            except SearchTimeout:
+                return best_move
+        return best_move
 
-        # TODO: finish this function!
-        raise NotImplementedError
+    def terminal_node(self, game, depth, player):
+        """Check if the node is terminal and return utility if it is"""
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        if depth == 0:
+            return True, self.score(game, player)
+        elif game.utility(player) != 0.:
+            return True, self.score(game, player)
+
+        return False, 0.
+
+    def get_max_value(self, game, depth, alpha, beta):
+        """Search for the maximum value of the node, expanding the children.
+        Alpha is the current best choice for maximum levels, and beta is the
+        current best choice for minimum levels, so our value should be beta at
+        most."""
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        terminal, utility = self.terminal_node(game, depth, game.active_player)
+        if terminal:
+            return utility, (-1, -1)
+
+        max_value = float("-inf")
+        best_move = (-1, -1)
+        available_moves = game.get_legal_moves()
+        for move in available_moves:
+            # print("Testing Max {}".format(move))
+            value = self.get_min_value(game.forecast_move(move),
+                                       depth-1, alpha, beta)[0]
+            # print("Max value {}".format(value))
+            if (value > max_value) or (best_move == (-1, -1)):
+                max_value = value
+                best_move = move
+                #If it is the current maximum value of the level, check if
+                #another branch has a lower value. If it does, stop searching
+                if max_value >= beta:
+                    # print("Greater than beta:", max_value, beta)
+                    return max_value, best_move
+                elif max_value > alpha:
+                    # print("New alpha: {}".format(max_value))
+                    alpha = max_value
+        return max_value, best_move
+
+
+    def get_min_value(self, game, depth, alpha, beta):
+        """Search the minimum value of the node, expanding the children.
+        Alpha is the current best choice for maximum levels, and beta is the
+        current best choice for minimum levels, so our value should be at least
+        alpha."""
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        terminal, utility = self.terminal_node(game, depth, game.inactive_player)
+        if terminal:
+            return utility, (-1, -1)
+
+        min_score = float("inf")
+        best_move = (-1, -1)
+        available_moves = game.get_legal_moves()
+        for move in available_moves:
+            # print("Testing Min {}".format(move))
+            #We just need the value, not the optimal move here
+            value = self.get_max_value(game.forecast_move(move),
+                                       depth-1, alpha, beta)[0]
+            # print("Value Min {}".format(value))
+            if (value < min_score) or (best_move == (-1, -1)):
+                min_score = value
+                best_move = move
+                #In a max level, if there is already a higher value(alpha),
+                #we should stop the evaluation
+                if min_score <= alpha:
+                    # print("Lesser than alpha: {} {}".format(min_score, alpha))
+                    return min_score, best_move
+                #If it is the higher value, keep checking and mark that as the
+                #lowest possible score of this level
+                elif min_score < beta:
+                    # print("New beta: {}".format(min_score))
+                    beta = min_score
+        return min_score, best_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -386,5 +476,20 @@ class AlphaBetaPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # best_move = (-1, -1)
+        # best_score = float("-inf")
+        # available_actions = game.get_legal_moves()
+        # values = []
+        # print("New level: depth {}".format(depth))
+        best_move = self.get_max_value(game, depth, alpha, beta)[1]
+        # print(best_move)
+            # print("Value {}".format(value))
+            # values.append([value,alpha,beta])
+            # if (value > best_score) or (best_move == (-1, -1)):
+            #     best_score = value
+            #     best_move = action
+            #     alpha = best_score
+
+        # print("Actions: {} Values: {}".format(available_actions, values))
+        # print("Best Move: {}".format(best_move))
+        return best_move
